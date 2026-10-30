@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Открывай, когда…</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23b3243d'><path d='M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'/></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Great+Vibes&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+<style>
+  :root {
+    --bg-deep: #2b0a12;
+    --bg-mid: #5a1827;
+    --cream: #fdf6ec;
+    --red: #b3243d;
+    --red-bright: #ff4757;
+    --red-soft: #ff6b81;
+    --text: #4a1c24;
+    --text-soft: #6b3b3b;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    min-height: 100vh;
+    background: radial-gradient(circle at 20% 10%, var(--bg-mid) 0%, var(--bg-deep) 70%);
+    font-family: 'Cormorant Garamond', serif;
+    color: var(--cream);
+    overflow-x: hidden;
+    position: relative;
+    padding: 40px 20px 120px;
+    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="%23ff4757" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>') 12 12, auto;
+  }
+
+  #preloader {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: var(--bg-deep); z-index: 10000;
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    transition: opacity 0.8s ease;
+  }
+
+  .preloader-heart {
+    font-size: 60px;
+    animation: pulseHeart 1s infinite alternate;
+  }
+
+  @keyframes pulseHeart {
+    0% { transform: scale(0.9); opacity: 0.7; }
+    100% { transform: scale(1.1); opacity: 1; text-shadow: 0 0 20px #ff4757; }
+  }
+
+  .preloader-text {
+    color: var(--cream);
+    font-size: 24px;
+    margin-top: 20px;
+    font-family: 'Great Vibes', cursive;
+  }
+
+  .bg-blob {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(80px);
+    z-index: -1;
+    opacity: 0.4;
+    animation: floatBg 18s infinite alternate ease-in-out;
+    pointer-events: none;
+  }
+  .blob1 { width: 300px; height: 300px; background: var(--red-bright); top: -60px; left: -60px; }
+  .blob2 { width: 400px; height: 400px; background: var(--red); bottom: -100px; right: -100px; animation-delay: -6s; }
+  @keyframes floatBg {
+    0%   { transform: translate(0,0) scale(1); }
+    100% { transform: translate(80px, 60px) scale(1.2); }
+  }
+
+  #hearts {
+    position: fixed; inset: 0;
+    pointer-events: none; z-index: 0; overflow: hidden;
+  }
+
+  .heart {
+    position: absolute; top: -10vh;
+    opacity: 0.8;
+    filter: drop-shadow(0 0 8px rgba(255, 71, 87, 0.8));
+    animation: fall linear infinite;
+  }
+
+  @keyframes fall {
+    0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(115vh) rotate(360deg); opacity: 0; }
+  }
+
+  .player-container {
+    position: fixed; bottom: 20px; right: 20px; z-index: 999;
+    display: flex; flex-direction: column; align-items: center;
+    background: rgba(43, 10, 18, 0.85); padding: 15px 12px;
+    border-radius: 30px; backdrop-filter: blur(10px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 107, 129, 0.3);
+    transition: all 0.3s ease;
+    gap: 12px;
+  }
+
+  .playback-controls {
+    display: flex; flex-direction: column; gap: 8px;
+  }
+
+  .control-btn {
+    background: transparent; border: none; color: var(--cream);
+    font-size: 20px; cursor: pointer; display: flex;
+    align-items: center; justify-content: center;
+    transition: transform 0.2s ease, color 0.2s ease;
+    padding: 5px;
+  }
+
+  .control-btn:hover { transform: scale(1.2); color: var(--red-bright); }
+  .control-btn.pulsing { animation: pulse 2s infinite; border-radius: 50%; }
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.7); }
+    70%  { box-shadow: 0 0 0 15px rgba(255, 71, 87, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0); }
+  }
+
+  .volume-control {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    width: 100%;
+  }
+
+  #volumeSlider {
+    -webkit-appearance: none; width: 70px; height: 4px;
+    background: rgba(255, 255, 255, 0.2); border-radius: 2px; outline: none;
+    cursor: pointer; transition: background 0.3s ease;
+  }
+  #volumeSlider::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--red-bright); cursor: pointer;
+    box-shadow: 0 0 8px rgba(255, 71, 87, 0.8);
+    transition: transform 0.2s ease;
+  }
+  #volumeSlider::-webkit-slider-thumb:hover { transform: scale(1.3); }
+
+  main {
+    max-width: 900px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+  }
+
+  .header { text-align: center; margin-bottom: 40px; }
+
+  .pre-title {
+    font-family: 'Great Vibes', cursive;
+    font-size: 32px;
+    color: var(--red-soft);
+    margin: 0 0 6px;
+  }
+
+  .main-title {
+    font-family: 'Great Vibes', cursive;
+    font-size: 56px;
+    font-weight: 400;
+    color: var(--cream);
+    margin: 0 0 20px;
+    line-height: 1.1;
+    text-shadow: 0 0 20px rgba(255, 71, 87, 0.45);
+  }
+
+  .progress {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .progress-label {
+    font-size: 16px;
+    font-style: italic;
+    color: #e8c8ce;
+    letter-spacing: 1px;
+  }
+  .progress-bar {
+    width: 220px;
+    height: 6px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.12);
+    overflow: hidden;
+  }
+  #progressFill {
+    height: 100%;
+    width: 0%;
+    border-radius: 4px;
+    background: linear-gradient(to right, var(--red-soft), var(--red-bright));
+    transition: width 0.6s ease;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 18px;
+    margin-top: 30px;
+  }
+
+  .card {
+    position: relative;
+    background-color: var(--cream);
+    background-image: url('https://www.transparenttextures.com/patterns/cream-paper.png');
+    color: var(--text);
+    border-radius: 16px;
+    padding: 30px 18px;
+    cursor: pointer;
+    text-align: center;
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.35s ease;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(179, 36, 61, 0.1);
+    overflow: hidden;
+    min-height: 150px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    animation: cardIn 0.6s ease forwards;
+  }
+
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .card:hover {
+    transform: translateY(-6px) rotate(-0.5deg);
+    box-shadow: 0 14px 32px rgba(255, 71, 87, 0.35);
+  }
+  .card:active { transform: translateY(-2px) scale(0.98); }
+
+  .card-icon {
+    font-size: 42px;
+    line-height: 1;
+    filter: drop-shadow(0 2px 4px rgba(179, 36, 61, 0.25));
+  }
+  .card-title {
+    font-family: 'Great Vibes', cursive;
+    font-size: 28px;
+    color: var(--red);
+    line-height: 1.15;
+    margin: 0;
+  }
+
+  .card.opened::after {
+    content: "✓";
+    position: absolute;
+    top: 12px;
+    right: 15px;
+    font-size: 16px;
+    color: var(--red);
+    opacity: 0.6;
+  }
+
+  .card.secret-locked {
+    background: linear-gradient(135deg, #3a1a22 0%, #2b0a12 100%);
+    color: var(--cream);
+    border: 1px dashed rgba(255, 107, 129, 0.4);
+    cursor: not-allowed;
+    opacity: 1 !important;
+    transform: translateY(0) !important;
+  }
+  .card.secret-locked .card-title { color: var(--red-soft); }
+  .card.secret-locked:hover { transform: none !important; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); }
+
+  .card.secret-unlocked {
+    background: linear-gradient(135deg, #fff0f2 0%, var(--cream) 100%);
+    border: 2px solid var(--red-bright);
+    opacity: 1 !important;
+    transform: translateY(0) scale(1.02) !important;
+    display: flex !important;
+    visibility: visible !important;
+    box-shadow: 0 0 25px rgba(255, 71, 87, 0.6), 0 8px 24px rgba(0, 0, 0, 0.35);
+    animation: secretGlow 2s infinite alternate !important;
+  }
+  @keyframes secretGlow {
+    from { box-shadow: 0 0 15px rgba(255, 71, 87, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35); }
+    to   { box-shadow: 0 0 40px rgba(255, 71, 87, 0.9), 0 8px 24px rgba(0, 0, 0, 0.35); }
+  }
+
+  .footer-signature {
+    text-align: center;
+    margin-top: 60px;
+    font-family: 'Great Vibes', cursive;
+    font-size: 30px;
+    color: var(--red-soft);
+    opacity: 0.85;
+    text-shadow: 0 0 15px rgba(255, 71, 87, 0.3);
+  }
+
+  #letterOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+    background: rgba(10, 2, 4, 0.85);
+    backdrop-filter: blur(8px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+  #letterOverlay.show {
+    display: flex;
+    opacity: 1;
+  }
+
+  .letter {
+    position: relative;
+    background-color: var(--cream);
+    background-image: url('https://www.transparenttextures.com/patterns/cream-paper.png');
+    color: var(--text);
+    max-width: 560px;
+    width: 100%;
+    max-height: 88vh;
+    overflow-y: auto;
+    border-radius: 18px;
+    padding: 44px 34px 34px;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(179, 36, 61, 0.15);
+    transform: scale(0.9) translateY(30px);
+    opacity: 0;
+    transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease;
+  }
+  #letterOverlay.show .letter {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+
+  .letter::-webkit-scrollbar { width: 6px; }
+  .letter::-webkit-scrollbar-track { background: rgba(179, 36, 61, 0.05); }
+  .letter::-webkit-scrollbar-thumb { background: var(--red); border-radius: 10px; }
+
+  .close-btn {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    background: rgba(179, 36, 61, 0.1);
+    border: none;
+    color: var(--red);
+    font-size: 26px;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    cursor: pointer;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s ease, transform 0.2s ease;
+    z-index: 2;
+  }
+  .close-btn:hover { background: rgba(179, 36, 61, 0.2); transform: rotate(90deg); }
+
+  .letter-icon {
+    font-size: 52px;
+    text-align: center;
+    margin-bottom: 12px;
+    filter: drop-shadow(0 3px 6px rgba(179, 36, 61, 0.2));
+  }
+
+  .letter-title {
+    font-family: 'Great Vibes', cursive;
+    font-size: 40px;
+    text-align: center;
+    color: var(--red);
+    margin: 0 0 22px;
+    line-height: 1.15;
+    font-weight: 400;
+  }
+
+  .letter-body p {
+    font-size: 19px;
+    line-height: 1.7;
+    color: #332125;
+    margin: 0 0 16px;
+    opacity: 0;
+    transform: translateY(8px);
+    animation: lineIn 0.6s ease forwards;
+  }
+  .letter-body p:last-child { margin-bottom: 0; }
+  @keyframes lineIn {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .letter-photo-wrap {
+    margin: 22px auto 12px;
+    text-align: center;
+  }
+  .letter-photo-wrap img {
+    max-width: 100%;
+    max-height: 340px;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    transform: rotate(-1.5deg);
+    border: 6px solid #fff;
+  }
+
+  .letter-signature {
+    text-align: right;
+    font-family: 'Great Vibes', cursive;
+    font-size: 30px;
+    color: var(--red);
+    margin: 26px 6px 0 0;
+  }
+
+  .back-btn {
+    display: block;
+    margin: 22px auto 0;
+    background: linear-gradient(to right, var(--red-soft), var(--red-bright));
+    color: #fff;
+    border: none;
+    padding: 12px 26px;
+    border-radius: 30px;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(255, 71, 87, 0.4);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .back-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(255, 71, 87, 0.6); }
+
+  @media (max-width: 520px) {
+    body { padding: 26px 14px 100px; }
+    .pre-title { font-size: 26px; }
+    .main-title { font-size: 40px; }
+    .grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .card { padding: 20px 12px; min-height: 130px; gap: 10px; }
+    .card-icon { font-size: 32px; }
+    .card-title { font-size: 22px; }
+    .letter { padding: 38px 22px 26px; }
+    .letter-title { font-size: 30px; }
+    .letter-body p { font-size: 17px; }
+    .letter-icon { font-size: 40px; }
+    .footer-signature { font-size: 24px; }
+    .progress-bar { width: 180px; }
+
+    .player-container { bottom: 15px; right: 15px; padding: 12px 10px; }
+    #volumeSlider { width: 50px; }
+    .control-btn { font-size: 18px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div id="preloader">
+  <div class="preloader-heart">❤️</div>
+  <div class="preloader-text"><span id="progressText">0</span>%</div>
+</div>
+
+<div class="bg-blob blob1"></div>
+<div class="bg-blob blob2"></div>
+<div id="hearts"></div>
+
+<audio id="bgMusic"></audio>
+
+<div class="player-container">
+  <div class="playback-controls">
+    <button class="control-btn" id="prevBtn">⏮️</button>
+    <button class="control-btn pulsing" id="playBtn">▶️</button>
+    <button class="control-btn" id="nextBtn">⏭️</button>
+  </div>
+
+  <div class="volume-control">
+    <span class="control-btn" id="volIcon">🔊</span>
+    <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="0.5">
+  </div>
+</div>
+
+<main>
+  <div class="header">
+    <p class="pre-title">Для Настясиси</p>
+    <h1 class="main-title">Открывай, когда…</h1>
+    <div class="progress">
+      <span class="progress-label" id="progressLabel">Открыто 0 из 10</span>
+      <div class="progress-bar"><div id="progressFill"></div></div>
+    </div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="footer-signature">С любовью, твой Владикулит ❤️</div>
+</main>
+
+<div id="letterOverlay" onclick="if(event.target===this) closeLetter()">
+  <div class="letter">
+    <button class="close-btn" onclick="closeLetter()">×</button>
+    <div class="letter-icon" id="letterIcon">💌</div>
+    <h2 class="letter-title" id="letterTitle"></h2>
+    <div class="letter-body" id="letterBody"></div>
+    <div class="letter-photo-wrap" id="letterPhotoWrap" style="display:none;">
+      <img id="letterPhoto" alt="">
+    </div>
+    <p class="letter-signature">Твой Владикулит ❤️</p>
+    <button class="back-btn" onclick="closeLetter()">← Назад</button>
+  </div>
+</div>
+
+<script>
+let progress = 0;
+const preloader = document.getElementById('preloader');
+const progressText = document.getElementById('progressText');
+
+const loadInterval = setInterval(() => {
+  progress += Math.random() * 15;
+  if (progress >= 100) {
+    progress = 100;
+    clearInterval(loadInterval);
+    setTimeout(() => {
+      preloader.style.opacity = '0';
+      setTimeout(() => preloader.style.display = 'none', 800);
+    }, 400);
+  }
+  progressText.innerText = Math.floor(progress);
+}, 150);
+
+const CARDS = [
+  {
+    icon: '🌧️',
+    title: 'Когда тебе грустно',
+    body: `Если тебе сейчас грустно - не держи это в себе. Ты имеешь право грустить, злиться, уставать. Ты не обязана быть сильной всё время.
+
+Я хочу, чтобы ты знала: даже в самый хмурый день ты для меня - самое светлое. И что бы ни случилось, я на твоей стороне.
+
+Обнимаю тебя крепко-крепко. Считай это виртуальным объятием, которое длится, пока не станет легче.`,
+    photo: ''
+  },
+  {
+    icon: '🌙',
+    title: 'Когда не можешь уснуть',
+    body: `Если ты читаешь это, значит сон всё ещё не пришёл. Ничего страшного. Я рядом.
+
+Представь, что я сижу рядом, держу тебя за руку и никуда не спешу. Ты можешь просто закрыть глаза, а я буду тихонько шептать, что всё хорошо.
+
+Спи, моя хорошая. Утро будет добрее, чем кажется сейчас.`,
+    photo: 'sleep.jpg'
+  },
+  {
+    icon: '💌',
+    title: 'Когда скучаешь',
+    body: `Я тоже скучаю. Даже если я молчу - скучаю.
+
+Ты не представляешь, как часто я ловлю себя на мысли «а вот сейчас бы ей это показать». Ты уже давно стала той, с кем я хочу делить всё, что происходит.
+
+Так что твоя скука - не в одни ворота. Мы скучаем оба.`,
+    photo: ''
+  },
+  {
+    icon: '😤',
+    title: 'Когда злишься на меня',
+    body: `Если ты злишься на меня - я хочу это услышать. Не потому что мне приятно ссориться, а потому что мне важно то, что ты чувствуешь.
+
+Я не идеальный. Я могу сказать не то, промолчать не вовремя, сделать глупо. Но я обещаю: я никогда не оставлю тебя с этим одной.
+
+Давай поговорим. По-честному. Без «всё нормально», если это не так.`,
+    photo: ''
+  },
+  {
+    icon: '🤔',
+    title: 'Когда сомневаешься во мне',
+    body: `Если у тебя появились сомнения - не прячь их. Я хочу, чтобы ты спрашивала. Чтобы проверяла. Чтобы не боялась быть неудобной.
+
+Я знаю, что доверие - это не слова. Это время и поступки. И я готов их доказывать.
+
+Ты не обязана верить мне на слово. Но я хочу, чтобы ты видела: мои слова и мои действия - об одном.`,
+    photo: ''
+  },
+  {
+    icon: '🌸',
+    title: 'Когда хочешь улыбнуться',
+    body: `Помнишь, как мы смеялись над всякой ерундой, и не могли остановиться? Вот так и должно быть. Серьёзность - штука хорошая, но иногда её надо выключать.
+
+Пожалуйста, не забывай улыбаться. У тебя это лучше всех получается.
+
+А если хочешь - улыбнись прямо сейчас. Вот. Уже лучше, да?`,
+    photo: 'smile.png'
+  },
+  {
+    icon: '☕',
+    title: 'Когда нужна поддержка',
+    body: `Я знаю, что ты сильнее, чем тебе кажется в такие моменты. Ты уже проходила через многое - и всё равно остаёшься доброй и светлой. Это огромная сила.
+
+Ты справишься. Не потому что «надо», а потому что ты умеешь. А я буду рядом, чтобы помочь, если попросишь.
+
+Ты не одна.`,
+    photo: ''
+  },
+  {
+    icon: '📸',
+    title: 'Когда хочешь вспомнить нас',
+    body: `Наши моменты - это не только встречи. Это и голосовые по три раза переслушанные, и глупые стикеры, и «а помнишь, как мы…» в переписке.
+
+Ты уже стала частью моей жизни. И я очень хочу, чтобы этой части становилось только больше.
+
+Спасибо, что ты есть.`,
+    photo: 'our_photo.jpg'
+  },
+  {
+    icon: '🌟',
+    title: 'Когда забыла, что ты классная',
+    body: `Слушай. Ты - классная. Не потому что я так решил. А потому что ты сама по себе: интересная, живая, настоящая.
+
+Ты умеешь то, что другие не умеют. Ты замечаешь то, что другие пропускают. Ты - не «одна из многих». Ты - ты.
+
+И это огромная редкость. Не забывай об этом, ладно?`,
+    photo: 'priatya.png'
+  },
+  {
+    icon: '🎁',
+    title: 'Когда хочешь сюрприз',
+    body: `Раз ты открыла эту карточку - держи сюрприз.
+
+Закрой глаза на секунду и представь: мы вместе где-нибудь, где тепло и спокойно. Нет ни спешки, ни дел. Есть только мы.
+
+Теперь открой глаза. Это не «когда-нибудь». Это «обязательно».
+
+Я хочу, чтобы у нас было много таких моментов. И я сделаю для этого всё, что смогу.`,
+    photo: ''
+  }
+];
+
+const SECRET_CARD = {
+  icon: '✨',
+  title: 'Когда ты прочитала все письма',
+  body: `Ты дошла до конца. Значит, прочитала всё, что я хотел сказать для каждого момента.
+
+Спасибо тебе. За то, что читаешь. За то, что ты рядом. За то, что дала мне повод писать всё это.
+
+Хочу, чтобы ты знала одну вещь: среди всех людей в моей жизни - именно ты стала той, с кем хочется строить планы. И это не красивые слова. Это правда.
+
+Береги себя. И помни: у тебя всегда есть ещё одно письмо - прямо здесь.`,
+  photo: ''
+};
+
+const LETTER_SIGNATURE = 'Твой Владикулит ❤️';
+const STORAGE_KEY = 'open-when-opened';
+
+let opened = [];
+try {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    const parsed = JSON.parse(saved);
+    if (Array.isArray(parsed)) opened = parsed;
+  }
+} catch(e) { opened = []; }
+
+let currentCardIndex = null;
+
+const grid = document.getElementById('grid');
+const progressLabel = document.getElementById('progressLabel');
+const progressFill = document.getElementById('progressFill');
+
+function renderCards() {
+  grid.innerHTML = '';
+
+  CARDS.forEach((card, i) => {
+    const el = document.createElement('div');
+    el.className = 'card' + (opened.includes(i) ? ' opened' : '');
+    el.style.animationDelay = (i * 0.06) + 's';
+    el.innerHTML = `
+      <div class="card-icon">${card.icon}</div>
+      <h3 class="card-title">${card.title}</h3>
+    `;
+    el.addEventListener('click', () => openLetter(i));
+    grid.appendChild(el);
+  });
+
+  const allOpened = opened.length >= CARDS.length;
+  const secretEl = document.createElement('div');
+
+  if (allOpened) {
+    secretEl.className = 'card secret-unlocked';
+    secretEl.innerHTML = `
+      <div class="card-icon">${SECRET_CARD.icon}</div>
+      <h3 class="card-title">${SECRET_CARD.title}</h3>
+    `;
+    secretEl.addEventListener('click', () => openSecretLetter());
+  } else {
+    secretEl.className = 'card secret-locked';
+    secretEl.innerHTML = `
+      <div class="card-icon">🔒</div>
+      <h3 class="card-title">Секретная карточка</h3>
+    `;
+  }
+
+  secretEl.style.animationDelay = (CARDS.length * 0.06) + 's';
+  grid.appendChild(secretEl);
+  updateProgress(allOpened);
+}
+
+function updateProgress(allOpened) {
+  const total = CARDS.length;
+  const done = opened.length;
+
+  progressLabel.textContent = `Открыто ${done} из ${total}`;
+  progressFill.style.width = (done / total * 100) + '%';
+}
+
+const overlay = document.getElementById('letterOverlay');
+const letterIcon = document.getElementById('letterIcon');
+const letterTitle = document.getElementById('letterTitle');
+const letterBody = document.getElementById('letterBody');
+const letterPhotoWrap = document.getElementById('letterPhotoWrap');
+const letterPhoto = document.getElementById('letterPhoto');
+
+function openLetter(index) {
+  currentCardIndex = index;
+  const card = CARDS[index];
+
+  showLetter(card);
+
+  const wasLocked = opened.length < CARDS.length;
+
+  if (!opened.includes(index)) {
+    opened.push(index);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(opened));
+  }
+
+  renderCards();
+  triggerConfetti();
+
+  if (opened.length >= CARDS.length && wasLocked) {
+    setTimeout(() => {
+      const secretCard = grid.lastElementChild;
+      if (secretCard) {
+        secretCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 500);
+  }
+}
+
+function openSecretLetter() {
+  if (opened.length < CARDS.length) return;
+  showLetter(SECRET_CARD);
+  triggerConfetti();
+}
+
+function showLetter(card) {
+  letterIcon.textContent = card.icon || '💌';
+  letterTitle.textContent = card.title || '';
+
+  letterBody.innerHTML = '';
+  const paragraphs = (card.body || '').split(/\n\s*\n/).filter(Boolean);
+  paragraphs.forEach((text, i) => {
+    const p = document.createElement('p');
+    p.textContent = text.trim();
+    p.style.animationDelay = (0.15 + i * 0.15) + 's';
+    letterBody.appendChild(p);
+  });
+
+  if (card.photo) {
+    letterPhoto.src = card.photo;
+    letterPhotoWrap.style.display = 'block';
+  } else {
+    letterPhotoWrap.style.display = 'none';
+    letterPhoto.removeAttribute('src');
+  }
+
+  const sig = document.querySelector('.letter-signature');
+  if (sig) sig.textContent = LETTER_SIGNATURE;
+
+  overlay.classList.add('show');
+  document.body.style.overflow = 'hidden';
+
+  const letterEl = overlay.querySelector('.letter');
+  if (letterEl) letterEl.scrollTop = 0;
+}
+
+function closeLetter() {
+  overlay.classList.remove('show');
+  document.body.style.overflow = '';
+  currentCardIndex = null;
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeLetter();
+});
+
+function triggerConfetti() {
+  if (typeof confetti !== 'function') return;
+  confetti({
+    particleCount: 120,
+    spread: 80,
+    origin: { y: 0.6 },
+    colors: ['#ff4757', '#ff6b81', '#b3243d', '#ffffff', '#fdf6ec']
+  });
+}
+
+const playlist = [
+  'polovina.mp3',
+  'picca-romans.mp3',
+  'battary.mp3',
+  'vlyblen.mp3',
+  'bolen.mp3',
+  'sysestvo.mp3'
+];
+
+let currentTrackIndex = 0;
+let errorCount = 0;
+const audio = document.getElementById('bgMusic');
+const playBtn = document.getElementById('playBtn');
+const nextBtn = document.getElementById('nextBtn');
+const prevBtn = document.getElementById('prevBtn');
+const volumeSlider = document.getElementById('volumeSlider');
+const volIcon = document.getElementById('volIcon');
+let audioStarted = false;
+
+audio.volume = volumeSlider.value;
+
+if (playlist.length > 0) {
+  audio.src = playlist[currentTrackIndex];
+}
+
+function playMusic() {
+  audio.play().then(() => {
+    playBtn.textContent = '⏸️';
+    playBtn.classList.remove('pulsing');
+    audioStarted = true;
+  }).catch((e) => {
+    console.log("Файл не найден или браузер заблокировал автозапуск.");
+  });
+}
+
+playBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (!audio.src) return;
+  if (audio.paused) {
+    playMusic();
+  } else {
+    audio.pause();
+    playBtn.textContent = '▶️';
+  }
+});
+
+nextBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (playlist.length === 0) return;
+
+  currentTrackIndex = (currentTrackIndex + 1) % playlist.length;
+  audio.src = playlist[currentTrackIndex];
+  playMusic();
+
+  nextBtn.style.transform = 'scale(0.8)';
+  setTimeout(() => nextBtn.style.transform = 'scale(1)', 150);
+});
+
+prevBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (playlist.length === 0) return;
+
+  currentTrackIndex = (currentTrackIndex - 1 + playlist.length) % playlist.length;
+  audio.src = playlist[currentTrackIndex];
+  playMusic();
+
+  prevBtn.style.transform = 'scale(0.8)';
+  setTimeout(() => prevBtn.style.transform = 'scale(1)', 150);
+});
+
+volumeSlider.addEventListener('input', (e) => {
+  audio.volume = e.target.value;
+  if (audio.volume === 0) {
+    volIcon.textContent = '🔇';
+  } else if (audio.volume < 0.5) {
+    volIcon.textContent = '🔉';
+  } else {
+    volIcon.textContent = '🔊';
+  }
+});
+
+let previousVolume = volumeSlider.value;
+volIcon.addEventListener('click', () => {
+  if (audio.volume > 0) {
+    previousVolume = audio.volume;
+    audio.volume = 0;
+    volumeSlider.value = 0;
+    volIcon.textContent = '🔇';
+  } else {
+    audio.volume = previousVolume || 0.5;
+    volumeSlider.value = audio.volume;
+    volIcon.textContent = audio.volume < 0.5 ? '🔉' : '🔊';
+  }
+});
+
+audio.addEventListener('ended', () => {
+  nextBtn.click();
+});
+
+audio.addEventListener('playing', () => {
+  errorCount = 0;
+});
+
+audio.addEventListener('error', () => {
+  errorCount++;
+  console.warn("Не удалось загрузить трек: " + playlist[currentTrackIndex]);
+  if (errorCount >= playlist.length) {
+    console.error("Все треки в плейлисте недоступны. Проверьте названия файлов.");
+    playBtn.textContent = '❌';
+    return;
+  }
+  nextBtn.click();
+});
+
+document.addEventListener('click', function tryStart() {
+  if (audioStarted) return;
+  if (!audio.src) return;
+  playMusic();
+  document.removeEventListener('click', tryStart);
+}, { once: true });
+
+const heartsContainer = document.getElementById('hearts');
+const heartSymbols = ['❤️', '🤍', '🌸', '🌹'];
+function createHeart() {
+  if (document.hidden) return;
+  const heart = document.createElement('div');
+  heart.classList.add('heart');
+  heart.textContent = heartSymbols[Math.floor(Math.random() * heartSymbols.length)];
+  heart.style.left = Math.random() * 100 + 'vw';
+  heart.style.fontSize = (Math.random() * 15 + 18) + 'px';
+  const duration = Math.random() * 6 + 6;
+  heart.style.animationDuration = duration + 's';
+  heartsContainer.appendChild(heart);
+  setTimeout(() => heart.remove(), duration * 1000);
+}
+setInterval(createHeart, 500);
+
+let lastTrail = 0;
+function createTrail(x, y) {
+  const el = document.createElement('div');
+  el.textContent = Math.random() > 0.5 ? '❤️' : '✨';
+  Object.assign(el.style, {
+    position: 'fixed',
+    left: x + 'px',
+    top: y + 'px',
+    pointerEvents: 'none',
+    zIndex: 9999,
+    fontSize: '24px',
+    transform: 'translate(-50%, -50%)',
+    filter: 'drop-shadow(0 0 6px rgba(255, 71, 87, 0.9))',
+    animation: 'trailFade 1s ease-out forwards'
+  });
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1000);
+}
+
+const styleTrail = document.createElement('style');
+styleTrail.textContent = `
+  @keyframes trailFade {
+    0%   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(0.5) translateY(30px); }
+  }
+`;
+document.head.appendChild(styleTrail);
+
+document.addEventListener('mousemove', (e) => {
+  const now = Date.now();
+  if (now - lastTrail > 80) {
+    createTrail(e.clientX, e.clientY);
+    lastTrail = now;
+  }
+});
+
+renderCards();
+</script>
+</body>
+</html>
